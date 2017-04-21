@@ -4,7 +4,7 @@
 
 var chai = require('chai');
 var assert = chai.assert;
-var speakeasy = require('..');
+var TOTP = require('../libotp').TOTP;
 
 /*
 
@@ -172,31 +172,54 @@ describe('RFC 6238 test vector', function () {
     code: '47863826',
     algorithm: 'SHA512'
   }].forEach(function (subject) {
-    var key = new Buffer('12345678901234567890');
-    var nbytes, i;
+    describe('algorithm ' + subject.algorithm, function () {
+      var key = new Buffer('12345678901234567890');
+      var nbytes, i;
 
-    it('should calculate counter value for time ' + subject.time, function () {
-      var counter = speakeasy._counter({
-        time: subject.time
-      });
-      assert.equal(counter, subject.counter);
-    });
+      // set hash size based on algorithm
+      switch (subject.algorithm) {
+        case 'SHA256': nbytes = 32;
+          break;
+        case 'SHA512': nbytes = 64;
+          break;
+        default: nbytes = 20;
+      }
 
-    it('should calculate counter value for date ' + subject.date, function () {
-      var counter = speakeasy._counter({
-        time: Math.floor(subject.date / 1000)
-      });
-      assert.equal(counter, subject.counter);
-    });
+      // repeat the key to the minimum length
+      if (key.length > nbytes) {
+        key = key.slice(0, nbytes);
+      } else {
+        key = [key];
+        i = ~~(nbytes / key.length);
+        while (i--) key.push(key[0]);
+        key = Buffer.concat(key).slice(0, nbytes);
+      }
 
-    it('should generate TOTP code for time ' + subject.time + ' and algorithm ' + subject.algorithm, function () {
-      var counter = speakeasy.totp({
-        secret: key,
-        time: subject.time,
-        algorithm: subject.algorithm,
-        digits: 8
+      it('should calculate counter value for time ' + subject.time, function () {
+        var counter = new TOTP({
+          secret: key,
+          time: subject.time
+        }).counter;
+        assert.equal(counter, subject.counter);
       });
-      assert.equal(counter, subject.code);
+
+      it('should calculate counter value for date ' + subject.date, function () {
+        var counter = new TOTP({
+          secret: key,
+          time: Math.floor(subject.date / 1000)
+        }).counter;
+        assert.equal(counter, subject.counter);
+      });
+
+      it('should generate TOTP code for time ' + subject.time, function () {
+        var counter = new TOTP({
+          secret: key,
+          algorithm: subject.algorithm,
+          time: subject.time,
+          digits: 8
+        }).next();
+        assert.equal(counter, subject.code);
+      });
     });
   });
 });

@@ -8,10 +8,10 @@
   },
   "plugins": ["plugins/markdown"],
   "templates": {
-    "applicationName": "Speakeasy",
+    "applicationName": "libotp",
     "meta": {
-      "title": "Speakeasy",
-      "description": "Speakeasy - Two-factor authentication for Node.js. One-time passcode generator (HOTP/TOTP) with URL generation for Google Authenticator",
+      "title": "libotp",
+      "description": "libotp - Two-factor authentication for Node.js. One-time passcode generator (HOTP/TOTP) with URL generation for Google Authenticator",
       "keyword": "one-time passcode hotp totp google authenticator"
     },
     "default": {

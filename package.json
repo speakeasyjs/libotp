@@ -1,20 +1,26 @@
 {
-  "name": "speakeasy",
+  "name": "libotp",
   "description": "Two-factor authentication for Node.js. One-time passcode generator (HOTP/TOTP) with support for Google Authenticator.",
-  "version": "2.0.0",
+  "version": "3.0.0-devel",
   "author": {
-    "name": "Mark Bao & Speakeasy Contributors",
-    "email": "mark@markbao.com"
+    "name": "Speakeasy Contributors"
   },
-  "contributors": [{
-    "name": "Michael Phan-Ba",
-    "email": "michael@mikepb.com"
-  }, {
-    "name": "Guy Halford-Thompson",
-    "email": "guy@cach.me"
-  }],
-  "homepage": "http://github.com/speakeasyjs/speakeasy",
-  "bugs": "https://github.com/speakeasyjs/speakeasy/issues",
+  "contributors": [
+    {
+      "name": "Mark Bao",
+      "email": "mark@markbao.com"
+    },
+    {
+      "name": "Michael Phan-Ba",
+      "email": "michael@mikepb.com"
+    },
+    {
+      "name": "Guy Halford-Thompson",
+      "email": "guy@cach.me"
+    }
+  ],
+  "homepage": "http://github.com/speakeasyjs/libotp",
+  "bugs": "https://github.com/speakeasyjs/libotp/issues",
   "keywords": [
     "authentication",
     "google authenticator",
@@ -31,28 +37,31 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git://github.com/speakeasyjs/speakeasy.git"
+    "url": "git://github.com/speakeasyjs/libotp.git"
   },
-  "main": "index.js",
+  "main": "libotp.js",
   "engines": {
-    "node": ">= 0.10.0"
+    "node": ">= 6"
   },
   "dependencies": {
     "base32.js": "0.0.1"
   },
   "devDependencies": {
-    "chai": "^3.4.1",
-    "coveralls": "^2.11.6",
-    "istanbul": "^0.4.2",
-    "jsdoc": "^3.3.1",
-    "mocha": "^2.2.5",
-    "semistandard": "^7.0.5",
-    "snazzy": "^2.0.1"
+    "@types/node": "^7.0.13",
+    "chai": "^3.5.0",
+    "coveralls": "^2.13.0",
+    "istanbul": "^0.4.5",
+    "jsdoc": "^3.4.3",
+    "mocha": "^2.5.3",
+    "tslint": "^5.1.0",
+    "tslint-config-standard": "^5.0.2",
+    "typescript": "^2.3.0"
   },
   "scripts": {
+    "prepare": "tsc --project tsconfig.json",
     "test": "mocha",
-    "doc": "jsdoc -c jsdoc.json && sed -i '' -e 's/․/./g' docs/speakeasy/*/*.html",
+    "doc": "jsdoc -c jsdoc.json && sed -i '' -e 's/․/./g' docs/libotp/*/*.html",
     "cover": "istanbul cover _mocha -- test/* -R spec",
-    "lint": "semistandard --verbose | snazzy"
+    "lint": "tslint --fix --project tsconfig.json --type-check *.ts"
   }
 }
