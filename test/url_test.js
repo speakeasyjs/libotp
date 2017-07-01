@@ -65,7 +65,7 @@ var url = require('url');
           digits: 'hello',
           counter: 0
         }).url();
-      }, /invalid digits `hello`/);
+      }, /invalid digits/);
       // Non-6 and non-8 digits should not throw, but should have a warn message
       assert.doesNotThrow(function () {
         new OTP({
@@ -74,15 +74,15 @@ var url = require('url');
           digits: 12,
           counter: 0
         }).url();
-      }, /invalid digits `12`/);
-      assert.doesNotThrow(function () {
+      }, /invalid digits/);
+      assert.throws(function () {
         new OTP({
           secret: 'hello',
           label: 'that',
           digits: '7',
           counter: 0
         }).url();
-      }, /invalid digits `7`/);
+      }, /invalid digits/);
       assert.ok(new OTP({
         secret: 'hello',
         label: 'that',
@@ -95,54 +95,64 @@ var url = require('url');
         digits: 8,
         counter: 0
       }).url());
-      assert.ok(new OTP({
-        secret: 'hello',
-        label: 'that',
-        digits: '6',
-        counter: 0
-      }).url());
-      assert.ok(new OTP({
-        secret: 'hello',
-        label: 'that',
-        digits: '8',
-        counter: 0
-      }).url());
-    });
-
-    it('should validate period', function () {
       assert.throws(function () {
         new OTP({
           secret: 'hello',
           label: 'that',
-          period: 'hello',
+          digits: '6',
           counter: 0
         }).url();
-      }, /invalid period `hello`/);
-      assert.ok(new OTP({
-        secret: 'hello',
-        label: 'that',
-        period: 60,
-        counter: 0
-      }).url());
-      assert.ok(new OTP({
-        secret: 'hello',
-        label: 'that',
-        period: 121,
-        counter: 0
-      }).url());
-      assert.ok(new OTP({
-        secret: 'hello',
-        label: 'that',
-        period: '60',
-        counter: 0
-      }).url());
-      assert.ok(new OTP({
-        secret: 'hello',
-        label: 'that',
-        period: '121',
-        counter: 0
-      }).url());
+      }, /invalid digits/);
+      assert.throws(function () {
+        new OTP({
+          secret: 'hello',
+          label: 'that',
+          digits: '8',
+          counter: 0
+        }).url();
+      }, /invalid digits/);
     });
+
+    if (klass == 'TOTP') {
+      it('should validate period', function () {
+        assert.throws(function () {
+          new OTP({
+            secret: 'hello',
+            label: 'that',
+            period: 'hello',
+            counter: 0
+          }).url();
+        }, /invalid period/);
+        assert.ok(new OTP({
+          secret: 'hello',
+          label: 'that',
+          period: 60,
+          counter: 0
+        }).url());
+        assert.ok(new OTP({
+          secret: 'hello',
+          label: 'that',
+          period: 121,
+          counter: 0
+        }).url());
+        assert.throws(function () {
+          new OTP({
+            secret: 'hello',
+            label: 'that',
+            period: '60',
+            counter: 0
+          }).url();
+        }, /invalid period/);
+        assert.throws(function () {
+          new OTP({
+            secret: 'hello',
+            label: 'that',
+            period: '121',
+            counter: 0
+          }).url();
+        }, /invalid period/);
+      });
+    }
 
     it('should generate an URL compatible with the Google Authenticator app', function () {
       var otp = new OTP({

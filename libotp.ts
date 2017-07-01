@@ -4,20 +4,20 @@ import * as base32 from 'base32.js'
 import * as crypto from 'crypto'
 import * as url from 'url'
 
-function _getSecretByteSize(algorithm): number {
+function byteSizeForAlgo(algorithm: string): number {
   switch (algorithm) {
-    case 'SHA1':
+    case 'sha1':
       return 20
-    case 'SHA256':
+    case 'sha256':
       return 32
-    case 'SHA512':
+    case 'sha512':
       return 64
     default:
       console.warn('libotp: Unrecognized hash algorithm `' + algorithm + '`')
   }
 }
 
-function _getPaddedSecret(secret: Buffer, byteSize: number): Buffer {
+function padSecret(secret: Buffer, byteSize: number): Buffer {
   // The secret for sha1, sha256 and sha512 needs to be a fixed number of
   // bytes for the one-time-password to be calculated correctly. Pad the
   // buffer to the correct size be repeating the secret to the desired
@@ -39,6 +39,23 @@ function _getPaddedSecret(secret: Buffer, byteSize: number): Buffer {
   return secret
 }
 
+function checkTime(time: Date|number|(() => Date|number)): number|(() => number) {
+  if (typeof time === 'function') {
+    const fn: (() => any) = time
+    time = fn()
+    if (time instanceof Date) {
+      return () => Math.floor(fn() / 1000)
+    } else if (typeof time === 'number') {
+      return () => Math.floor(fn())
+    }
+  } else if (time instanceof Date) {
+    return +time / 1000
+  } else if (typeof time === 'number') {
+    return Math.floor(<number>time)
+  }
+  throw new Error('invalid time ' + time)
+}
+
 /**
  * Generate a base32-encoded random secret.
  *
@@ -55,100 +72,134 @@ export function generateSecret(byteSize=20, encoding='base32'): string {
   }
 }
 
+interface BaseParams {
+  secret: Buffer|string
+  encoding?: 'ascii' | 'hex' | 'base32' | 'base64' | string
+
+  digits?: number
+  window?: number
+  period?: number
+
+  algorithm?: 'sha1' | 'sha256' | 'sha512' | string
+
+  label?: string
+  issuer?: string
+}
+
+export interface HOTPParams extends BaseParams {
+  counter: number
+}
+
+export interface TOTPParams extends BaseParams {
+  time?: Date|number|(() => Date|number)
+  epoch?: number
+  period?: number
+}
+
 /**
- * Hash-based one-time (HOTP) password.
+ * One-time password.
  */
-export class HOTP {
-  public readonly type: string = 'hotp'
+abstract class OTP {
+  public readonly type: string
 
-  public secret: Buffer
-  public encoding: string
-  public counter: number
+  public readonly secret: Buffer|string
+  public readonly encoding: string
 
-  public digits: number
-  public window: number
-  public period: number
+  public abstract get counter(): number
 
-  public _algorithm: string
-  public get algorithm() { return this._algorithm }
-  public set algorithm(value: string) { this._algorithm = value.toUpperCase() }
+  public readonly digits: number = 6
+  public readonly window: number = 1
 
-  public label: string
-  public issuer: string
+  public readonly algorithm: string = 'sha1'
 
-  public _required: string[]
-  public _optional: string[]
+  public readonly label: string
+  public readonly issuer: string
 
-  private _digitsFactor: number
-  private _digitsPadding: string
-  private _secretByteSize: number
-  private _paddedSecret: Buffer
+  protected _modulo: number
+  protected _padding: string
+  protected _secret: Buffer
+  protected _padded: Buffer
 
   /**
    * Constructor.
    *
-   * @param {Object} params
-   * @param {Buffer|string} params.secret Shared secret
-   * @param {string} [params.encoding="ascii"] Secret encoding (ascii, hex,
-   *   base32, base64). Only used if `params.secret` is not a `Buffer`.
-   * @param {number} [params.counter=0] Counter value
-   * @param {number} [params.digits=6] The number of digits for the
-   *   one-time code.
-   * @param {number} [params.window=1] The allowable margin for the
-   *   counter. {@link HOTP.diff}.
-   * @param {string} [params.algorithm="SHA1"] Hash algorithm (SHA1,
-   *   SHA256, SHA512).
-   * @param {string} [params.label] Used for otpauth URL generation only.
-   *   Identify the account with which the OTP secret is associated, e.g.
-   *   the user's email address.
-   * @param {string} [params.issuer] Used for otpauth URL generation only.
-   *   The provider or service with which the OTP secret is associated.
+   * @param {BaseParams} params
    */
-  constructor(params) {
-    this.set(params)
-  }
+  constructor(params: BaseParams) {
+    // required parameters
+    if (!params) throw new Error('missing params')
+    if (!params.secret) throw new Error('missing secret')
 
-  public set(params): void {
-    if (params) {
-
-      // set required params
-      this._required.forEach((key) => {
-        const value = params[key]
-        if (value == null) {
-          throw new Error('missing ' + key)
-        }
-        this[key] = value
-      })
-
-      // set optional params only if unset to allow use of prototypical
-      // inheritance for default values
-      this._optional.forEach((key) => {
-        const value = params[key]
-        if (value != null) {
-          this[key] = value
-        }
-      })
-
-    } else if (this._required.length !== 0) {
-      throw new Error('missing ' + this._required[0])
-    }
-
-    if (!Buffer.isBuffer(this.secret)) {
-      if (this.encoding === 'base32') {
-          this.secret = new Buffer(base32.decode(this.secret))
+    // check secret
+    this.secret = params.secret
+    if (!Buffer.isBuffer(params.secret)) {
+      if (!params.encoding) {
+        console.warn('libotp: A string secret was provided without an' +
+                     ' encoding. Consider providing a Buffer secret or' +
+                     ' the string encoding.')
       } else {
-          this.secret = new Buffer(this.secret, this.encoding);
+        this.encoding = params.encoding
       }
     }
 
-    this._digitsFactor = Math.pow(10, this.digits)
-    this._digitsPadding = new Array(this.digits + 1).join('0')
+    // check digits
+    if (params.digits) {
+      if (~~params.digits !== params.digits) {
+        throw new Error('invalid digits')
+      }
+      this.digits = params.digits
+    }
+
+    // check window
+    if (params.window) {
+      if (~~params.window !== params.window) {
+        throw new Error('invalid window')
+      }
+      this.window = params.window
+    }
+
+    if (params.algorithm) this.algorithm = params.algorithm.toLowerCase()
+
+    if (params.label) this.label = params.label
+    if (params.issuer) this.issuer = params.issuer
+
+    this._modulo = Math.pow(10, this.digits)
+    this._padding = new Array(this.digits + 1).join('0')
+  }
+
+  protected _getSecret(): Buffer {
+    if (this._secret) return this._padded
+
+    let secret, padded
+
+    // Parse secret into Buffer.
+    if (Buffer.isBuffer(this.secret)) {
+      secret = this.secret
+    } else if (this.encoding === 'base32') {
+      secret = new Buffer(base32.decode(this.secret))
+    } else {
+      secret = new Buffer(this.secret, this.encoding || 'ascii');
+    }
+
+    // Pad secret.
+    const byteSize = byteSizeForAlgo(this.algorithm)
+    if (secret.length < byteSize) {
+      console.warn('libotp: HMAC key repeated to ' + byteSize + 'bytes.' +
+                   ' Compatibility could be improved by using a secret' +
+                   ' with a byte size of ' + byteSize + '.')
+      padded = padSecret(secret, byteSize)
+    }
+
+    this._secret = secret
+    this._padded = padded || secret
+
+    return this._padded
   }
 
   /**
-   * Digest the HOTP token.
+   * Digest the OTP token.
    *
-   * @return {Buffer} The HOTP token as a buffer.
+   * @return {Buffer} The OTP token as a buffer.
    */
   public digest(): Buffer {
     // create a buffer from the counter
@@ -162,34 +213,22 @@ export class HOTP {
       tmp = tmp >> 8
     }
 
-    if (!this._paddedSecret) {
-      const byteSize = _getSecretByteSize(this.algorithm)
-      if (this.secret.length < byteSize) {
-        console.warn('libotp: HMAC key repeated to ' + byteSize + 'bytes;' +
-                     ' compatibility could be improved by using a secret' +
-                     ' with a byte size of ' + byteSize + '.')
-        this._paddedSecret = _getPaddedSecret(this.secret, byteSize)
-      } else {
-        this._paddedSecret = this.secret
-      }
-    }
-
     // return hmac digest buffer
-    const hmac = crypto.createHmac(this.algorithm, this._paddedSecret)
+    const hmac = crypto.createHmac(this.algorithm, this._getSecret())
     hmac.update(buf)
     return hmac.digest()
   }
 
   /**
-   * Get the HOTP token as an integer, without incrementing the counter.
+   * Get the OTP token as an integer, without incrementing the counter.
    *
-   * @return {number} The HOTP token.
+   * @return {number} The OTP token.
    */
   public peekInt(): number {
     // digest the params
     const digest = this.digest()
 
-    // compute HOTP offset
+    // compute OTP offset
     const offset = digest[digest.length - 1] & 0xf
 
     // calculate binary code (RFC4226 5.4)
@@ -198,38 +237,23 @@ export class HOTP {
       (digest[offset + 2] & 0xff) << 8 |
       (digest[offset + 3] & 0xff)
 
-    return code % this._digitsFactor
+    return code % this._modulo
   }
 
   /**
-   * Get the HOTP token as a zero-padded string, without incrementing the
+   * Get the OTP token as a zero-padded string, without incrementing the
    * counter.
    *
-   * @return {number} The HOTP token.
+   * @return {number} The OTP token.
    */
   public peek(): string {
     // left-pad token
-    const token = this._digitsPadding + this.peekInt().toString(10)
+    const token = this._padding + this.peekInt().toString(10)
     return token.substr(-this.digits)
   }
 
   /**
-   * Generate a HOTP token, incrementing the counter value.
-   *
-   * The `this.counter` value is incremented by 1 after the token is
-   * generated. The new counter value must be stored in durable storage,
-   * with conflicting updates resolving to the largest counter value.
-   *
-   * @return {string} The TOTP token.
-   */
-  public next(): string {
-    const token = this.peek()
-    this.counter++
-    return token
-  }
-
-  /**
-   * Calculate the difference with the given HOTP token.
+   * Calculate the difference with the given OTP token.
    *
    * The token is valid if it matches a generated code in the range
    * `[C - W, C + W)` where `C` is the counter value and `W` is the window
@@ -237,32 +261,37 @@ export class HOTP {
    *
    * @param {string} token The other OTP token
    * @return {number} If the token is valid,
-   *   `(counter value for token) - this.counter`, or `NaN` otherwise.
+   *   `(counter value for token) - this.counter`, or `false` otherwise.
    */
-  public diff(token: string): number {
+  public diff(token: string): number|false {
     // fail if token is not of correct length
     if (!token || token.length !== this.digits) {
-      return NaN
+      return false
     }
 
     // parse token to number or fail
     const code = parseInt(token, 10)
     if (isNaN(code)) {
-      return NaN
+      return false
     }
 
     // short path for no window
     if (this.window === 0) {
-      return this.peekInt() === code ? 0 : NaN
+      return this.peekInt() === code ? 0 : false
     }
 
-    // shadow options
-    let self = new HOTP(this);
+    // loop in [C, C + W) or [C - W, C + W)
+    let i = this.counter;
+    if (this instanceof TOTP) i -= this.window;
+    const limit = this.counter + this.window
 
-    // loop in [C - W, C + W)
-    const limit = self.counter + this.window
-    for (let i = this.counter - this.window; i < limit; i++) {
-      self.counter = i
+    // proxy self
+    function Proxy() {}
+    Proxy.prototype = this
+    let self = new Proxy()
+    Object.defineProperty(self, 'counter', { get: () => i })
+
+    for (; i < limit; i++) {
       if (self.peekInt() === code) {
         // found a matching code, return delta
         return i - this.counter
@@ -270,31 +299,17 @@ export class HOTP {
     }
 
     // no codes have matched
-    return NaN
+    return false
   }
 
   /**
-   * Test if a HOTP token is valid.
+   * Test if a OTP token is valid.
    *
    * @param {string} Token to validate
    * @return {Boolean} True if the token is valid.
    */
   public test(token: string): boolean {
-    return !isNaN(this.diff(token))
-  }
-
-  /**
-   * Test if a HOTP token is valid, updating the instance counter as needed.
-   *
-   * @param {string} Token to validate
-   * @return {Boolean} True if the token is valid.
-   */
-  public update(token: string): boolean {
-    const delta = this.diff(token)
-    if (delta < 0) {
-      this.counter -= delta
-    }
-    return !isNaN(delta)
+    return this.diff(token) !== false
   }
 
   /**
@@ -326,7 +341,8 @@ export class HOTP {
     }
 
     // convert secret to base32
-    const secret = base32.encode(this.secret)
+    this._getSecret()
+    const secret = base32.encode(this._secret)
 
     // build query
     const query = {secret: encodeURIComponent(secret)}
@@ -337,16 +353,17 @@ export class HOTP {
     } else {
       console.warn('libotp: issuer is strongly recommended for otpauth URL')
     }
+
     // set counter if HOTP
-    if (this.type === 'hotp') {
+    if (this instanceof HOTP) {
       query['counter'] = this.counter
     }
 
     // set algorithm
-    if (this.algorithm !== 'SHA1') {
+    if (this.algorithm !== 'sha1') {
       console.warn('libotp: otpauth URL compatibility could be improved ' +
-                   'by using the default algorithm of SHA1')
-      query['algorithm'] = this.algorithm
+                   'by using the default algorithm of sha1')
+      query['algorithm'] = this.algorithm.toUpperCase()
     }
 
     // set digits
@@ -357,14 +374,12 @@ export class HOTP {
     }
 
     // set period
-    if (this.type === 'totp') {
+    if (this instanceof TOTP) {
       if (this.period !== 30) {
         console.warn('libotp: otpauth URL compatibility could be improved ' +
                      'by using the default period of 30 seconds')
         query['period'] = this.period
       }
-    } else if (this.type !== 'hotp') {
-      throw new Error('invalid type `' + this.type + '`')
     }
 
     // return url
@@ -378,14 +393,71 @@ export class HOTP {
   }
 }
 
-// set defaults
-HOTP.prototype.encoding = 'ascii'
-HOTP.prototype.digits = 6
-HOTP.prototype.window = 1
-HOTP.prototype._algorithm = 'SHA1'
-HOTP.prototype._required = ['secret', 'counter']
-HOTP.prototype._optional = ['digits', 'encoding', 'algorithm', 'window',
-                            'label', 'issuer']
+/**
+ * Hash-based one-time (HOTP) password.
+ */
+export class HOTP extends OTP {
+  public readonly type: string = 'hotp'
+
+  protected _counter: number
+  public get counter(): number { return this._counter }
+
+  /**
+   * Constructor.
+   *
+   * @param {HOTPParams} params
+   * @param {Buffer|string} params.secret Shared secret
+   * @param {string} [params.encoding="ascii"] Secret encoding (ascii, hex,
+   *   base32, base64). Only used if `params.secret` is not a `Buffer`.
+   * @param {number} params.counter Counter value
+   * @param {number} [params.digits=6] The number of digits for the
+   *   one-time code.
+   * @param {number} [params.window=1] The allowable margin for the
+   *   counter. {@link HOTP.diff}.
+   * @param {string} [params.algorithm="SHA1"] Hash algorithm (SHA1,
+   *   SHA256, SHA512).
+   * @param {string} [params.label] Used for otpauth URL generation only.
+   *   Identify the account with which the OTP secret is associated, e.g.
+   *   the user's email address.
+   * @param {string} [params.issuer] Used for otpauth URL generation only.
+   *   The provider or service with which the OTP secret is associated.
+   */
+  constructor(params: HOTPParams) {
+    super(params)
+    if (params.counter == null) throw new Error('missing counter')
+    this._counter = params.counter
+  }
+
+  /**
+   * Generate a HOTP token, incrementing the counter value.
+   *
+   * The `this.counter` value is incremented by 1 after the token is
+   * generated. The new counter value must be stored in durable storage,
+   * with conflicting updates resolving to the largest counter value.
+   *
+   * @return {string} The TOTP token.
+   */
+  public next(): string {
+    const token = this.peek()
+    this._counter++
+    return token
+  }
+
+  /**
+   * Test if a HOTP token is valid, updating the instance counter as needed.
+   *
+   * @param {string} Token to validate
+   * @return {Boolean} True if the token is valid.
+   */
+  public update(token: string): boolean {
+    const delta = this.diff(token)
+    const ok = delta !== false
+    if (ok && delta > 0) {
+      this._counter += <number>delta
+    }
+    return ok
+  }
+}
 
 /**
  * Time-based one-time (TOTP) password.
@@ -431,15 +503,12 @@ HOTP.prototype._optional = ['digits', 'encoding', 'algorithm', 'window',
  * var otp = new TOTP({secret: secret, window: 1, period: 60});
  * ```
  */
-export class TOTP extends HOTP {
+export class TOTP extends OTP {
   public readonly type: string = 'totp'
 
-  public time: number|(() => number)
-  public epoch: number
-  // public period: number
-
-  public _required: string[]
-  public _optional: string[]
+  public time: number|(() => number) = () => Date.now() / 1000
+  public epoch: number = 0
+  public period: number = 30
 
   /**
    * Constructor.
@@ -474,6 +543,33 @@ export class TOTP extends HOTP {
    * @param {string} [params.issuer] Used for otpauth URL generation only.
    *   The provider or service with which the OTP secret is associated.
    */
+  constructor(params: TOTPParams) {
+    super(params)
+
+    // check time
+    if (params.time) this.time = checkTime(params.time)
+
+    // check epoch
+    if (params.epoch) {
+      if (~~params.epoch !== params.epoch) {
+        throw new Error('invalid epoch')
+      }
+      this.epoch = params.epoch
+    }
+
+    // check period
+    if (params.period) {
+      if (~~params.period !== params.period) {
+        throw new Error('invalid period')
+      } else if (this.period <= 0) {
+        throw new Error('invalid period <= 0')
+      } else if (this.period !== 30) {
+        console.warn('libotp: compatibility could be improved using the' +
+                     ' default period of 30 seconds')
+      }
+      this.period = params.period
+    }
+  }
 
   /**
    * Calculate counter value.
@@ -491,21 +587,5 @@ export class TOTP extends HOTP {
     return Math.floor((time - this.epoch) / this.period)
   }
 
-  public set(params) {
-    super.set(params)
-    if (this.period <= 0) {
-      throw new Error('params.period <= 0')
-    } else if (this.period !== 30) {
-      console.warn('libotp: compatibility could be improved by setting' +
-                   ' period = 30')
-    }
-  }
+  public next = TOTP.prototype.peek
 }
-
-// set defaults
-TOTP.prototype._required = HOTP.prototype._required.filter((s) => s !== 'counter')
-TOTP.prototype._optional = HOTP.prototype._optional.concat(['time', 'period', 'epoch'])
-TOTP.prototype.time = () => Date.now() / 1000
-TOTP.prototype.epoch = 0
-TOTP.prototype.period = 30
-TOTP.prototype.next = TOTP.prototype.peek

@@ -5,7 +5,7 @@
 var chai = require('chai');
 var assert = chai.assert;
 var TOTP = require('../libotp').TOTP;
-var HOTP = require('../libotp').HOTP;
+var TOTP = require('../libotp').TOTP;
 
 // These tests use the test vectors from RFC 6238's Appendix B: Test Vectors
 // http://tools.ietf.org/html/rfc6238#appendix-B
@@ -91,14 +91,7 @@ describe('TOTP Time-Based Algorithm Test', function () {
 
   describe("normal operation with secret = '12345678901234567890' with overridden counter 3", function () {
     it('should return correct one-time password', function () {
-      var topic = new HOTP({secret: '12345678901234567890', counter: 3}).next();
-      assert.equal(topic, '969429');
-    });
-  });
-
-  describe("normal operation with secret = '12345678901234567890' with overridden counter 3", function () {
-    it('should return correct one-time password', function () {
-      var topic = new HOTP({secret: '12345678901234567890', counter: 3}).next();
+      var topic = new TOTP({secret: '12345678901234567890', time: 3 * 30}).next();
       assert.equal(topic, '969429');
     });
   });
@@ -106,43 +99,43 @@ describe('TOTP Time-Based Algorithm Test', function () {
   describe('totp.diff() window tests', function () {
     var secret = 'rNONHRni6BAk7y2TiKrv';
     it('should get current TOTP value', function () {
-      this.token = new HOTP({secret: secret, counter: 1}).next();
-      assert.equal(this.token, '314097');
+      var topic = new TOTP({secret: secret, time: 1 * 30}).next();
+      assert.equal(topic, '314097');
     });
 
     it('should get TOTP value at counter 3', function () {
-      this.token = new HOTP({secret: secret, counter: 3}).next();
-      assert.equal(this.token, '663640');
+      var topic = new TOTP({secret: secret, time: 3 * 30}).next();
+      assert.equal(topic, '663640');
     });
 
     it('should get delta with varying window lengths', function () {
       var delta;
 
-      delta = new HOTP({secret: secret, counter: 1, window: 0}).diff('314097');
+      delta = new TOTP({secret: secret, time: 1 * 30, window: 0}).diff('314097');
       assert.strictEqual(delta, 0);
 
-      delta = new HOTP({secret: secret, counter: 1, window: 2}).diff('314097');
+      delta = new TOTP({secret: secret, time: 1 * 30, window: 2}).diff('314097');
       assert.strictEqual(delta, 0);
 
-      delta = new HOTP({secret: secret, counter: 1, window: 3}).diff('314097');
+      delta = new TOTP({secret: secret, time: 1 * 30, window: 3}).diff('314097');
       assert.strictEqual(delta, 0);
     });
 
     it('should get delta when the item is not at specified counter but within window', function () {
       // Use token at counter 3, initial counter 1, and a window of 2
-      var delta = new HOTP({secret: secret, counter: 1, window: 3}).diff('663640');
+      var delta = new TOTP({secret: secret, window: 3, time: 1 * 30}).diff('663640');
       assert.strictEqual(delta, 2);
     });
 
     it('should not get delta when the item is not at specified counter and not within window', function () {
       // Use token at counter 3, initial counter 1, and a window of 1
-      var delta = new HOTP({secret: secret, counter: 1, window: 1}).diff('663640');
-      assert.ok(isNaN(delta));
+      var delta = new TOTP({secret: secret, window: 1, time: 1 * 30}).diff('663640');
+      assert.strictEqual(delta, false);
     });
 
     it('should support negative delta values when token is on the negative side of the window', function () {
       // Use token at counter 1, initial counter 3, and a window of 2
-      var delta = new HOTP({secret: secret, counter: 3, window: 2}).diff('314097');
+      var delta = new TOTP({secret: secret, window: 2, time: 3 * 30}).diff('314097');
       assert.strictEqual(delta, -2);
     });
 

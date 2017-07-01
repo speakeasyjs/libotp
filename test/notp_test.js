@@ -56,7 +56,7 @@ it('HOTP', function () {
   var options = {
     secret: '12345678901234567890',
     window: 0,
-    counter: 0,
+    counter: 0
   };
   var tokens = ['755224', '287082', '359152', '969429', '338314', '254676', '287922', '162583', '399871', '520489'];
 
@@ -66,7 +66,7 @@ it('HOTP', function () {
 
   // check for invalid token value
   var otp = new libotp.HOTP(options);
-  assert.ok(isNaN(otp.diff('NOPASS')), 'Should not pass');
+  assert.strictEqual(otp.diff('NOPASS'), false, 'Should not pass');
   assert.notOk(otp.test('NOPASS'), 'Should not pass');
 
   // countercheck for failure
@@ -105,34 +105,34 @@ it('TOTtoken', function () {
   var otp = new libotp.TOTP(options);
 
   // countercheck for failure
-  assert.ok(isNaN(otp.diff('windowILLNOTtokenASS')), 'Should not pass');
+  assert.strictEqual(otp.diff('windowILLNOTtokenASS'), false, 'Should not pass');
   assert.notOk(otp.test('windowILLNOTtokenASS'), 'Should not pass');
 
   // countercheck for test vector at 59s
   otp.time = 59;
-  assert.equal(otp.diff('287082'), 0, 'Should be in sync');
   assert.ok(otp.test('287082'), 'Should pass');
+  assert.strictEqual(otp.diff('287082'), 0, 'Should be in sync');
 
   // countercheck for test vector at 1234567890s with delta
   otp.time = 1234567890;
-  assert.equal(otp.diff('005924'), 0, 'Should be in sync');
   assert.ok(otp.test('005924'), 'Should pass');
+  assert.strictEqual(otp.diff('005924'), 0, 'Should be in sync');
 
   // countercheck for test vector at 1111111109s with delta
   otp.time = 1111111109;
-  assert.equal(otp.diff('081804'), 0, 'Should be in sync');
   assert.ok(otp.test('081804'), 'Should pass');
+  assert.strictEqual(otp.diff('081804'), 0, 'Should be in sync');
 
   // countercheck for test vector at 2000000s with delta
   otp.time = 2000000000;
-  assert.equal(otp.diff('279037'), 0, 'Should be in sync');
   assert.ok(otp.test('279037'), 'Should pass');
+  assert.strictEqual(otp.diff('279037'), 0, 'Should be in sync');
 
   // countercheck for test vector at 1234567890s with custom counter with delta
   options.counter = 41152263;
   otp = new libotp.HOTP(options);
-  assert.equal(otp.diff('005924'), 0, 'Should be in sync');
   assert.ok(otp.test('005924'), 'Should pass');
+  assert.strictEqual(otp.diff('005924'), 0, 'Should be in sync');
 });
 
 /*
@@ -165,17 +165,17 @@ it('HOTPOutOfSync', function () {
   assert.ok(new libotp.HOTP(options).test(token),
             'Should pass for value of window >= 9');
 
-  // countercheck that test should pass for tokens behind the current
+  // countercheck that test should not pass for tokens behind the current
   token = '755224';
   options.counter = 7;
   options.window = 8;
-  assert.ok(new libotp.HOTP(options).test(token),
-            'Should pass for tokens behind the current counter');
+  assert.notOk(new libotp.HOTP(options).test(token),
+               'Should pass for tokens behind the current counter');
 });
 
 /*
  * countercheck for codes that are out of sync
- * windowe are going to use a value of T = 1999999909 (91s behind 2000000)
+ * windows are going to use a value of T = 1999999909 (91s behind 2000000000)
  */
 
 it('TOTPOutOfSync', function () {
@@ -185,7 +185,7 @@ it('TOTPOutOfSync', function () {
   };
   var token = '279037';
 
-  // countercheck that the test should fail for window < 2
+  // countercheck that the test should fail for window < 3
   options.window = 2;
   assert.notOk(new libotp.TOTP(options).test(token),
                'Should not pass for value of window < 3');
