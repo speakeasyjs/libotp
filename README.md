@@ -1,3 +1,20 @@
+
+# WIP: libotp
+
+libotp is a object-oriented rewrite of Speakeasy in TypeScript.
+
+To try locally:
+
+```
+npm install
+npm run prepare
+npm test
+```
+
+This README is not yet updated for libotp.
+
+---
+
 <img src="http://i.imgur.com/qRyNMx4.png" width="550">
 
 [![Build Status](https://travis-ci.org/speakeasyjs/speakeasy.svg?branch=v2)](https://travis-ci.org/speakeasyjs/speakeasy)
@@ -294,7 +311,7 @@ How this works:
 // Set ASCII secret
 var secret = 'rNONHRni6BAk7y2TiKrv';
 
-// Get HOTP counter token at counter = 42 
+// Get HOTP counter token at counter = 42
 var counter42 = speakeasy.hotp({ secret: secret, counter: 42 });
 // => '566646'
 
@@ -346,7 +363,7 @@ var token1 = speakeasy.totp({ secret: secret, time: 1453853945 }); // 625175
 var token3 = speakeasy.totp({ secret: secret, time: 1453854005 }); // 222636
 
 // We can check the time at token 3, 1453853975, with token 1, but use a window of 2
-// With a time step of 30 seconds, this will check all tokens from 60 seconds 
+// With a time step of 30 seconds, this will check all tokens from 60 seconds
 // before the time to 60 seconds after the time
 speakeasy.totp.verifyDelta({ secret: secret, token: token1, window: 2, time: 1453854005 });
 // => { delta: -2 }
@@ -415,9 +432,9 @@ symbols (if requested).</p>
 ### digest(options) ⇒ <code>Buffer</code>
 Digest the one-time passcode options.
 
-**Kind**: function  
+**Kind**: function
 
-**Returns**: <code>Buffer</code> - The one-time passcode as a buffer.  
+**Returns**: <code>Buffer</code> - The one-time passcode as a buffer.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -436,9 +453,9 @@ receive the one-time password for that counter position as a string. You can
 also specify a token length, as well as the encoding (ASCII, hexadecimal, or
 base32) and the hashing algorithm to use (SHA1, SHA256, SHA512).
 
-**Kind**: function  
+**Kind**: function
 
-**Returns**: <code>String</code> - The one-time passcode.  
+**Returns**: <code>String</code> - The one-time passcode.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -468,11 +485,11 @@ and the given counter value. For example, if given a counter 5 and a window
 10, `verifyDelta()` will look at tokens from 5 to 15, inclusive. If it finds
 it at counter position 7, it will return `{ delta: 2 }`.
 
-**Kind**: function  
+**Kind**: function
 
 **Returns**: <code>Object</code> - On success, returns an object with the counter
   difference between the client and the server as the `delta` property (i.e.
-  `{ delta: 0 }`).  
+  `{ delta: 0 }`).
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -492,10 +509,10 @@ verifies. Helper function for `hotp.verifyDelta()`` that returns a boolean
 instead of an object. For more on how to use a window with this, see
 hotp.verifyDelta.
 
-**Kind**: function  
+**Kind**: function
 
 **Returns**: <code>Boolean</code> - Returns true if the token matches within the given
-  window, false otherwise.  
+  window, false otherwise.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -521,9 +538,9 @@ base32) and the hashing algorithm to use (SHA1, SHA256, SHA512).
 Under the hood, TOTP calculates the counter value by finding how many time
 steps have passed since the epoch, and calls HOTP with that counter value.
 
-**Kind**: function  
+**Kind**: function
 
-**Returns**: <code>String</code> - The one-time passcode.  
+**Returns**: <code>String</code> - The one-time passcode.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -560,11 +577,11 @@ tokens from 2.5 minutes ago to 2.5 minutes in the future, inclusive.
 If it finds it at counter position 1002, it will return `{ delta: 2 }`.
 If it finds it at counter position 997, it will return `{ delta: -3 }`.
 
-**Kind**: function  
+**Kind**: function
 
 **Returns**: <code>Object</code> - On success, returns an object with the time step
   difference between the client and the server as the `delta` property (e.g.
-  `{ delta: 0 }`).  
+  `{ delta: 0 }`).
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -589,7 +606,7 @@ an object. For more on how to use a window with this, see totp.verifyDelta.
 **Kind**: function
 
 **Returns**: <code>Boolean</code> - Returns true if the token matches within the given
-  window, false otherwise.  
+  window, false otherwise.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -613,7 +630,7 @@ along with the URL used for the QR code for Google Authenticator (an otpauth
 URL). Use a QR code library to generate a QR code based on the Google
 Authenticator URL to obtain a QR code you can scan into the app.
 
-**Kind**: function    
+**Kind**: function
 
 **Returns**: A [`GeneratedSecret`](#GeneratedSecret) object
 
@@ -633,9 +650,9 @@ Authenticator URL to obtain a QR code you can scan into the app.
 Generates a key of a certain length (default 32) from A-Z, a-z, 0-9, and
 symbols (if requested).
 
-**Kind**: function  
+**Kind**: function
 
-**Returns**: <code>String</code> - The generated key.  
+**Returns**: <code>String</code> - The generated key.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -655,7 +672,7 @@ the app.
 To generate a suitable QR Code, pass the generated URL to a QR Code
 generator, such as the `qr-image` module.
 
-**Kind**: function  
+**Kind**: function
 
 **Throws**: Error if secret or label is missing, or if hotp is used and a
   counter is missing, if the type is not one of `hotp` or `totp`, if the
@@ -664,9 +681,9 @@ generator, such as the `qr-image` module.
   supported by Google Authenticator), and if the hashihng algorithm is
   not one of the supported SHA1, SHA256, or SHA512.
 
-**Returns**: <code>String</code> - A URL suitable for use with the Google Authenticator.  
+**Returns**: <code>String</code> - A URL suitable for use with the Google Authenticator.
 
-**See**: https://github.com/google/google-authenticator/wiki/Key-Uri-Format  
+**See**: https://github.com/google/google-authenticator/wiki/Key-Uri-Format
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -684,7 +701,7 @@ generator, such as the `qr-image` module.
 <a name="GeneratedSecret"></a>
 ### GeneratedSecret : <code>Object</code>
 
-**Kind**: global typedef  
+**Kind**: global typedef
 
 **Properties**
 
