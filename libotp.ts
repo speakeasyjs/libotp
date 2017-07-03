@@ -486,10 +486,10 @@ abstract class OTP {
  * var token = client.token()
  *
  * // validate token on server
- * if (server.test(token)) {
+ * if (server.update(token)) {
  *   // Token is valid.
- *   var counter = server.next()
  *   // Important: persist counter value here.
+ *   persist(server.counter)
  * } else {
  *   // Token is invalid.
  * }
@@ -524,18 +524,6 @@ export class HOTP extends OTP {
   }
 
   /**
-   * Increment the counter value.
-   *
-   * The new counter value must be stored in durable storage, with
-   * conflicting updates resolving to the largest counter value.
-   *
-   * @return {number} The counter value.
-   */
-  public next(): number {
-    return ++this.counter
-  }
-
-  /**
    * Test if a HOTP token is valid, updating the instance counter as needed.
    *
    * @param {string} Token to validate
@@ -545,7 +533,7 @@ export class HOTP extends OTP {
     const delta = this.diff(token)
     const ok = delta !== false
     if (ok && delta > 0) {
-      this.counter += <number>delta
+      this.counter += <number>delta + 1
     }
     return ok
   }
