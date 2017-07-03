@@ -89,18 +89,25 @@ function byteSizeForAlgo(algorithm: string): number {
   }
 }
 
-function padSecret(secret: Buffer, byteSize: number): Buffer {
+function padSecret(secret: Buffer, algorithm: string): Buffer {
   // The secret for sha1, sha256 and sha512 needs to be a fixed number of
   // bytes for the one-time-password to be calculated correctly. Pad the
   // buffer to the correct size be repeating the secret to the desired
   // length.
+  const byteSize = byteSizeForAlgo(algorithm)
+
   if (byteSize && secret.length < byteSize) {
+    debug('HMAC key repeated to %d bytes. Compatibility could be' +
+          ' improved by using a secret with a byte size of %d.',
+          byteSize, byteSize)
+
     let bufSize = 0
     const buffers = []
     while (bufSize < byteSize) {
       buffers.push(secret)
       bufSize += secret.length
     }
+
     const repeat = bufSize % byteSize
     if (repeat !== 0) {
       buffers.push(secret.slice(0, repeat))
@@ -109,6 +116,16 @@ function padSecret(secret: Buffer, byteSize: number): Buffer {
   }
 
   return secret
+}
+
+function secretAsBuffer(secret, encoding): Buffer {
+  if (Buffer.isBuffer(secret)) {
+    return secret
+  } else if (encoding === 'base32') {
+    return new Buffer(base32.decode(secret))
+  } else {
+    return new Buffer(secret, encoding || 'ascii')
+  }
 }
 
 /**
@@ -259,31 +276,9 @@ abstract class OTP {
   }
 
   protected _getSecret(): Buffer {
-    if (this._secret) return this._padded
-
-    let secret, padded
-
-    // Parse secret into Buffer.
-    if (Buffer.isBuffer(this.secret)) {
-      secret = this.secret
-    } else if (this.encoding === 'base32') {
-      secret = new Buffer(base32.decode(this.secret))
-    } else {
-      secret = new Buffer(this.secret, this.encoding || 'ascii');
-    }
-
-    // Pad secret.
-    const byteSize = byteSizeForAlgo(this.algorithm)
-    if (secret.length < byteSize) {
-      debug('HMAC key repeated to %d bytes. Compatibility could be' +
-            ' improved by using a secret with a byte size of %d.',
-            byteSize, byteSize)
-      padded = padSecret(secret, byteSize)
-    }
-
-    this._secret = secret
-    this._padded = padded || secret
-
+    if (this._padded) return this._padded
+    this._secret = secretAsBuffer(this.secret, this.encoding)
+    this._padded = padSecret(this._secret, this.algorithm)
     return this._padded
   }
 
