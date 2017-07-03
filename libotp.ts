@@ -2,7 +2,10 @@
 
 import * as base32 from 'base32.js'
 import * as crypto from 'crypto'
+import * as _debug from 'debug'
 import * as url from 'url'
+
+const debug = _debug('libotp')
 
 function byteSizeForAlgo(algorithm: string): number {
   switch (algorithm) {
@@ -13,7 +16,7 @@ function byteSizeForAlgo(algorithm: string): number {
     case 'sha512':
       return 64
     default:
-      console.warn('libotp: Unrecognized hash algorithm `' + algorithm + '`')
+      debug('Unrecognized hash algorithm `%s`', algorithm)
   }
 }
 
@@ -186,31 +189,42 @@ abstract class OTP {
     this.secret = params.secret
     if (!Buffer.isBuffer(params.secret)) {
       if (!params.encoding) {
-        console.warn('libotp: A string secret was provided without an' +
-                     ' encoding. Consider providing a Buffer secret or' +
-                     ' the string encoding.')
+        debug('A string secret was provided without an encoding. Consider' +
+              ' providing a Buffer secret or the string encoding.')
       } else {
         this.encoding = params.encoding
       }
     }
 
     // check digits
-    if (params.digits) {
-      if (~~params.digits !== params.digits) {
+    const digits = params.digits
+    if (digits) {
+      if (Math.floor(digits) !== digits) {
         throw new Error('invalid digits')
+      } else if (digits !== 6) {
+        debug('Compatibility could be improved by using the default' +
+              ' digits of 6.')
       }
-      this.digits = params.digits
+      this.digits = digits
     }
 
     // check window
-    if (params.window) {
-      if (~~params.window !== params.window) {
+    const window = params.window
+    if (window) {
+      if (Math.floor(window) !== window) {
         throw new Error('invalid window')
       }
-      this.window = params.window
+      this.window = window
     }
 
-    if (params.algorithm) this.algorithm = params.algorithm.toLowerCase()
+    if (params.algorithm) {
+      const algorithm = params.algorithm.toLowerCase()
+      if (algorithm !== 'sha1') {
+        debug('Compatibility could be improved by using the default' +
+              ' algorithm of sha1.')
+      }
+      this.algorithm = algorithm
+    }
 
     if (params.label) this.label = params.label
     if (params.issuer) this.issuer = params.issuer
@@ -236,9 +250,9 @@ abstract class OTP {
     // Pad secret.
     const byteSize = byteSizeForAlgo(this.algorithm)
     if (secret.length < byteSize) {
-      console.warn('libotp: HMAC key repeated to ' + byteSize + ' bytes.' +
-                   ' Compatibility could be improved by using a secret' +
-                   ' with a byte size of ' + byteSize + '.')
+      debug('HMAC key repeated to %d bytes. Compatibility could be' +
+            ' improved by using a secret with a byte size of %d.',
+            byteSize, byteSize)
       padded = padSecret(secret, byteSize)
     }
 
@@ -403,7 +417,7 @@ abstract class OTP {
     if (this.issuer) {
       query['issuer'] = encodeURIComponent(this.issuer)
     } else {
-      console.warn('libotp: issuer is strongly recommended for otpauth URL')
+      debug('Providing an issuer is strongly recommended for otpauth URL.')
     }
 
     // set counter if HOTP
@@ -413,25 +427,17 @@ abstract class OTP {
 
     // set algorithm
     if (this.algorithm !== 'sha1') {
-      console.warn('libotp: otpauth URL compatibility could be improved ' +
-                   'by using the default algorithm of sha1')
       query['algorithm'] = this.algorithm.toUpperCase()
     }
 
     // set digits
     if (this.digits !== 6) {
-      console.warn('libotp: otpauth URL compatibility could be improved ' +
-                   'by using the default digits of 6')
       query['digits'] = this.digits
     }
 
     // set period
-    if (this instanceof TOTP) {
-      if (this.period !== 30) {
-        console.warn('libotp: otpauth URL compatibility could be improved ' +
-                     'by using the default period of 30 seconds')
-        query['period'] = this.period
-      }
+    if (this instanceof TOTP && this.period !== 30) {
+      query['period'] = this.period
     }
 
     // return url
@@ -650,8 +656,8 @@ export class TOTP extends OTP {
       } else if (this.period <= 0) {
         throw new Error('invalid period <= 0')
       } else if (this.period !== 30) {
-        console.warn('libotp: compatibility could be improved using the' +
-                     ' default period of 30 seconds')
+        debug('Compatibility could be improved by using the default period' +
+              ' of 30 seconds.')
       }
       this.period = params.period
     }
