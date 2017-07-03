@@ -276,7 +276,7 @@ abstract class OTP {
    *
    * @return {number} The OTP token.
    */
-  public peekInt(): number {
+  public code(): number {
     // digest the params
     const digest = this.digest()
 
@@ -298,9 +298,9 @@ abstract class OTP {
    *
    * @return {number} The OTP token.
    */
-  public peek(): string {
+  public token(): string {
     // left-pad token
-    const token = this._padding + this.peekInt().toString(10)
+    const token = this._padding + this.code().toString(10)
     return token.substr(-this.digits)
   }
 
@@ -329,7 +329,7 @@ abstract class OTP {
 
     // short path for no window
     if (this.window === 0) {
-      return this.peekInt() === code ? 0 : false
+      return this.code() === code ? 0 : false
     }
 
     // loop in [C, C + W) or [C - W, C + W)
@@ -344,7 +344,7 @@ abstract class OTP {
     Object.defineProperty(self, 'counter', { get: () => i })
 
     for (; i < limit; i++) {
-      if (self.peekInt() === code) {
+      if (self.code() === code) {
         // found a matching code, return delta
         return i - this.counter
       }
@@ -459,7 +459,7 @@ abstract class OTP {
  * var server = new libotp.HOTP(params)
  *
  * // generate token on client
- * var token = client.peek()
+ * var token = client.token()
  *
  * // validate token on server
  * if (server.test(token)) {
@@ -579,7 +579,7 @@ export class HOTP extends OTP {
  * var server = new libotp.TOTP(params)
  *
  * // generate token on client
- * var token = client.peek()
+ * var token = client.token()
  *
  * // validate token on server
  * if (server.test(token)) {

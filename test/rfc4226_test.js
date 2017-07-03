@@ -86,7 +86,7 @@ describe('RFC 4226 test values', function () {
         var code = new HOTP({
           secret: '12345678901234567890',
           counter: count
-        }).peek();
+        }).token();
         assert.equal(code, expect);
       });
     });

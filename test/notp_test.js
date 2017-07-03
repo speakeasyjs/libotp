@@ -207,7 +207,7 @@ it('hotp_gen', function () {
   // countercheck for passes
   for (var i = 0; i < HOTP.length; i++) {
     options.counter = i;
-    assert.equal(new libotp.HOTP(options).peek(), HOTP[i], 'HOTP value should be correct');
+    assert.equal(new libotp.HOTP(options).token(), HOTP[i], 'HOTP value should be correct');
   }
 });
 
@@ -219,17 +219,17 @@ it('totp_gen', function () {
 
   // countercheck for test vector at 59s
   options.time = 59;
-  assert.equal(new libotp.TOTP(options).peek(), '287082', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).token(), '287082', 'TOTtoken values should match');
 
   // countercheck for test vector at 1234567890
   options.time = 1234567890;
-  assert.equal(new libotp.TOTP(options).peek(), '005924', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).token(), '005924', 'TOTtoken values should match');
 
   // countercheck for test vector at 1111111109
   options.time = 1111111109;
-  assert.equal(new libotp.TOTP(options).peek(), '081804', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).token(), '081804', 'TOTtoken values should match');
 
   // countercheck for test vector at 2000000000
   options.time = 2000000000;
-  assert.equal(new libotp.TOTP(options).peek(), '279037', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).token(), '279037', 'TOTtoken values should match');
 });
