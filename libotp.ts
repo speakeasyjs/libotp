@@ -643,7 +643,7 @@ export class TOTP extends OTP {
 
     // check epoch
     if (params.epoch) {
-      if (~~params.epoch !== params.epoch) {
+      if (Math.floor(params.epoch) !== params.epoch) {
         throw new Error('invalid epoch')
       }
       this.epoch = params.epoch
@@ -651,7 +651,7 @@ export class TOTP extends OTP {
 
     // check period
     if (params.period) {
-      if (~~params.period !== params.period) {
+      if (Math.floor(params.period) !== params.period) {
         throw new Error('invalid period')
       } else if (this.period <= 0) {
         throw new Error('invalid period <= 0')
