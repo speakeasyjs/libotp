@@ -16,7 +16,7 @@ var url = require('url');
         new OTP({
           label: 'that'
         }).url();
-      }, /missing secret/);
+      }, /missing secret/i);
     });
 
     it('should require label', function () {
@@ -25,7 +25,7 @@ var url = require('url');
           secret: 'hello',
           counter: 0
         }).url();
-      }, /missing label/);
+      }, /missing label/i);
     });
 
     it('should validate algorithm', function () {
@@ -36,7 +36,7 @@ var url = require('url');
           algorithm: 'hello',
           counter: 0
         }).url();
-      }, /invalid algorithm `hello`/);
+      }, /invalid algorithm `hello`/i);
       assert.ok(new OTP({
         secret: 'hello',
         label: 'that',
@@ -65,7 +65,7 @@ var url = require('url');
           digits: 'hello',
           counter: 0
         }).url();
-      }, /invalid digits/);
+      }, /invalid digits/i);
       // Non-6 and non-8 digits should not throw, but should have a warn message
       assert.doesNotThrow(function () {
         new OTP({
@@ -74,7 +74,7 @@ var url = require('url');
           digits: 12,
           counter: 0
         }).url();
-      }, /invalid digits/);
+      }, /invalid digits/i);
       assert.throws(function () {
         new OTP({
           secret: 'hello',
@@ -82,7 +82,7 @@ var url = require('url');
           digits: '7',
           counter: 0
         }).url();
-      }, /invalid digits/);
+      }, /invalid digits/i);
       assert.ok(new OTP({
         secret: 'hello',
         label: 'that',
@@ -102,7 +102,7 @@ var url = require('url');
           digits: '6',
           counter: 0
         }).url();
-      }, /invalid digits/);
+      }, /invalid digits/i);
       assert.throws(function () {
         new OTP({
           secret: 'hello',
@@ -110,7 +110,7 @@ var url = require('url');
           digits: '8',
           counter: 0
         }).url();
-      }, /invalid digits/);
+      }, /invalid digits/i);
     });
 
     if (klass == 'TOTP') {
@@ -122,7 +122,7 @@ var url = require('url');
             period: 'hello',
             counter: 0
           }).url();
-        }, /invalid period/);
+        }, /invalid period/i);
         assert.ok(new OTP({
           secret: 'hello',
           label: 'that',
@@ -142,7 +142,7 @@ var url = require('url');
             period: '60',
             counter: 0
           }).url();
-        }, /invalid period/);
+        }, /invalid period/i);
         assert.throws(function () {
           new OTP({
             secret: 'hello',
@@ -150,7 +150,7 @@ var url = require('url');
             period: '121',
             counter: 0
           }).url();
-        }, /invalid period/);
+        }, /invalid period/i);
       });
     }
 

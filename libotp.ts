@@ -7,6 +7,75 @@ import * as url from 'url'
 
 const debug = _debug('libotp')
 
+function checkWindow(window): number {
+  if (Math.floor(window) !== window) {
+    throw new Error('Invalid window `' + window + '`')
+  }
+  return window
+}
+
+function checkDigits(digits): number {
+  if (Math.floor(digits) !== digits) {
+    throw new Error('Invalid digits `' + digits + '`')
+  } else if (digits !== 6) {
+    debug('Compatibility could be improved by using the default digits of 6.')
+  }
+  return digits
+}
+
+function checkAlgorithm(algorithm): string {
+  algorithm = algorithm.toLowerCase()
+  if (algorithm !== 'sha1') {
+    debug('Compatibility could be improved by using the default algorithm' +
+          ' of sha1.')
+  }
+  return algorithm
+}
+
+function checkCounter(counter): number {
+  if (counter == null) {
+    throw new Error('Missing counter value')
+  }
+  if (Math.floor(counter) !== counter) {
+    throw new Error('Invalid counter `' + counter + '`')
+  }
+  return counter
+}
+
+function checkTime(time: Date|number|(() => Date|number)): number|(() => number) {
+  if (typeof time === 'function') {
+    const fn: (() => any) = time
+    time = fn()
+    if (time instanceof Date) {
+      return () => Math.floor(fn() / 1000)
+    } else if (typeof time === 'number') {
+      return () => Math.floor(fn())
+    }
+  } else if (time instanceof Date) {
+    return +time / 1000
+  } else if (typeof time === 'number') {
+    return Math.floor(<number>time)
+  }
+  throw new Error('invalid time ' + time)
+}
+
+function checkEpoch(epoch): number {
+  if (Math.floor(epoch) !== epoch) {
+    throw new Error('Invalid epoch `' + epoch + '`')
+  }
+  return epoch
+}
+
+function checkPeriod(period): number {
+  if (Math.floor(period) !== period || period <= 0) {
+    throw new Error('Invalid period `' + period + '`')
+  } else if (period !== 30) {
+    debug('Compatibility could be improved by using the default period' +
+          ' of 30 seconds.')
+  }
+  return period
+}
+
 function byteSizeForAlgo(algorithm: string): number {
   switch (algorithm) {
     case 'sha1':
@@ -16,7 +85,7 @@ function byteSizeForAlgo(algorithm: string): number {
     case 'sha512':
       return 64
     default:
-      debug('Unrecognized hash algorithm `%s`', algorithm)
+      throw new Error('Unrecognized hash algorithm `' + algorithm + '`')
   }
 }
 
@@ -40,23 +109,6 @@ function padSecret(secret: Buffer, byteSize: number): Buffer {
   }
 
   return secret
-}
-
-function checkTime(time: Date|number|(() => Date|number)): number|(() => number) {
-  if (typeof time === 'function') {
-    const fn: (() => any) = time
-    time = fn()
-    if (time instanceof Date) {
-      return () => Math.floor(fn() / 1000)
-    } else if (typeof time === 'number') {
-      return () => Math.floor(fn())
-    }
-  } else if (time instanceof Date) {
-    return +time / 1000
-  } else if (typeof time === 'number') {
-    return Math.floor(<number>time)
-  }
-  throw new Error('invalid time ' + time)
 }
 
 /**
@@ -182,8 +234,8 @@ abstract class OTP {
    */
   constructor(params: BaseParams) {
     // required parameters
-    if (!params) throw new Error('missing params')
-    if (!params.secret) throw new Error('missing secret')
+    if (!params) throw new Error('Missing parameters')
+    if (!params.secret) throw new Error('Missing secret value')
 
     // check secret
     this.secret = params.secret
@@ -196,36 +248,9 @@ abstract class OTP {
       }
     }
 
-    // check digits
-    const digits = params.digits
-    if (digits) {
-      if (Math.floor(digits) !== digits) {
-        throw new Error('invalid digits')
-      } else if (digits !== 6) {
-        debug('Compatibility could be improved by using the default' +
-              ' digits of 6.')
-      }
-      this.digits = digits
-    }
-
-    // check window
-    const window = params.window
-    if (window) {
-      if (Math.floor(window) !== window) {
-        throw new Error('invalid window')
-      }
-      this.window = window
-    }
-
-    if (params.algorithm) {
-      const algorithm = params.algorithm.toLowerCase()
-      if (algorithm !== 'sha1') {
-        debug('Compatibility could be improved by using the default' +
-              ' algorithm of sha1.')
-      }
-      this.algorithm = algorithm
-    }
-
+    if (params.digits) this.digits = checkDigits(params.digits)
+    if (params.window) this.window = checkWindow(params.window)
+    if (params.algorithm) this.algorithm = checkAlgorithm(params.algorithm)
     if (params.label) this.label = params.label
     if (params.issuer) this.issuer = params.issuer
 
@@ -402,9 +427,7 @@ abstract class OTP {
     const counter = this.counter
 
     // required options
-    if (!this.label) {
-      throw new Error('missing label')
-    }
+    if (!this.label) throw new Error('Missing label value')
 
     // convert secret to base32
     this._getSecret()
@@ -478,9 +501,7 @@ abstract class OTP {
  */
 export class HOTP extends OTP {
   public readonly type: string = 'hotp'
-
-  protected _counter: number
-  public get counter(): number { return this._counter }
+  public counter: number
 
   /**
    * Constructor.
@@ -504,12 +525,7 @@ export class HOTP extends OTP {
    */
   constructor(params: HOTPParams) {
     super(params)
-
-    // check-assign counter
-    const counter = params.counter
-    if (counter == null) throw new Error('missing counter')
-    if (Math.floor(counter) !== counter) throw new Error('invalid counter')
-    this._counter = counter
+    this.counter = checkCounter(params.counter)
   }
 
   /**
@@ -521,7 +537,7 @@ export class HOTP extends OTP {
    * @return {number} The counter value.
    */
   public next(): number {
-    return ++this._counter
+    return ++this.counter
   }
 
   /**
@@ -534,7 +550,7 @@ export class HOTP extends OTP {
     const delta = this.diff(token)
     const ok = delta !== false
     if (ok && delta > 0) {
-      this._counter += <number>delta
+      this.counter += <number>delta
     }
     return ok
   }
@@ -637,30 +653,9 @@ export class TOTP extends OTP {
    */
   constructor(params: TOTPParams) {
     super(params)
-
-    // check time
     if (params.time) this.time = checkTime(params.time)
-
-    // check epoch
-    if (params.epoch) {
-      if (Math.floor(params.epoch) !== params.epoch) {
-        throw new Error('invalid epoch')
-      }
-      this.epoch = params.epoch
-    }
-
-    // check period
-    if (params.period) {
-      if (Math.floor(params.period) !== params.period) {
-        throw new Error('invalid period')
-      } else if (this.period <= 0) {
-        throw new Error('invalid period <= 0')
-      } else if (this.period !== 30) {
-        debug('Compatibility could be improved by using the default period' +
-              ' of 30 seconds.')
-      }
-      this.period = params.period
-    }
+    if (params.epoch) this.epoch = checkEpoch(params.epoch)
+    if (params.period) this.period = checkPeriod(params.period)
   }
 
   /**
