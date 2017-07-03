@@ -47,15 +47,15 @@
     "base32.js": "0.0.1"
   },
   "devDependencies": {
-    "@types/node": "^7.0.13",
+    "@types/node": "^7.0.33",
     "chai": "^3.5.0",
-    "coveralls": "^2.13.0",
+    "coveralls": "^2.13.1",
     "istanbul": "^0.4.5",
     "jsdoc": "^3.4.3",
     "mocha": "^2.5.3",
-    "tslint": "^5.1.0",
+    "tslint": "^5.4.3",
     "tslint-config-standard": "^5.0.2",
-    "typescript": "^2.3.0"
+    "typescript": "^2.4.1"
   },
   "scripts": {
     "prepare": "tsc --project tsconfig.json",
