@@ -236,7 +236,7 @@ abstract class OTP {
     // Pad secret.
     const byteSize = byteSizeForAlgo(this.algorithm)
     if (secret.length < byteSize) {
-      console.warn('libotp: HMAC key repeated to ' + byteSize + 'bytes.' +
+      console.warn('libotp: HMAC key repeated to ' + byteSize + ' bytes.' +
                    ' Compatibility could be improved by using a secret' +
                    ' with a byte size of ' + byteSize + '.')
       padded = padSecret(secret, byteSize)
