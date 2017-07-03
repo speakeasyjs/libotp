@@ -217,7 +217,7 @@ describe('RFC 6238 test vector', function () {
           algorithm: subject.algorithm,
           time: subject.time,
           digits: 8
-        }).next();
+        }).peek();
         assert.equal(counter, subject.code);
       });
     });

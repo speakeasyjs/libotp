@@ -59,26 +59,53 @@ function checkTime(time: Date|number|(() => Date|number)): number|(() => number)
 /**
  * Generate a base32-encoded random secret.
  *
- * @param {number} [byteSize=20] Number of random bytes to generate for secret.
- * @param {string} [encoding="base32"] Encoding for returned secret.
+ * @param {number} [algorithm=sha1] Algorithm for which to generate secret.
+ * @param {string} [encoding="base32"] Encoding for returned secret. Set to
+ *   falsy for Buffer.
  * @return {string} The generated secret.
  */
-export function generateSecret(byteSize=20, encoding='base32'): string {
+export function generateSecret(algorithm='sha1', encoding='base32'): string|Buffer {
+  const byteSize = byteSizeForAlgo(algorithm)
   const bytes: Buffer = crypto.randomBytes(byteSize)
   if (encoding === 'base32') {
     return base32.encode(bytes).replace(/=/g, '')
+  } else if (!encoding) {
+    return bytes
   } else {
     return bytes.toString(encoding)
   }
 }
 
+/**
+ * Base parameters.
+ *
+ * OTP parameters:
+ * - `digits=6`: The number of digits for the one-time password. Used when
+ *   generating one-time passwords.
+ *
+ * Secret parameters:
+ *
+ * - `secret`: Required. The shared secret as a Buffer or string. Used when
+ *   generating and validating one-time passwords.
+ * - `encoding=ascii`: The string encoding for the string secret. Used if
+ *   the shared secret is a string. Ignored if shared secret is a buffer.
+ *
+ * Cryptographic parameters:
+ * - `algorithm=sha1`: The hash algorithm. Used when generating one-time
+ *   passwords. For maximum compatibility, use the default of `sha1`.
+ *
+ * Provider parameters:
+ * - `label`: The label to display in client apps, e.g. email address. Used
+ *   when generating Google Authenticator compatible URLs.
+ * - `issuer`: The issuer to display in client apps, e.g. website name. Used
+ *   when generating Google Authenticator compatible URLs.
+ */
 interface BaseParams {
   secret: Buffer|string
   encoding?: 'ascii' | 'hex' | 'base32' | 'base64' | string
 
   digits?: number
   window?: number
-  period?: number
 
   algorithm?: 'sha1' | 'sha256' | 'sha512' | string
 
@@ -86,10 +113,35 @@ interface BaseParams {
   issuer?: string
 }
 
+/**
+ * HOTP parameters.
+ *
+ * HOTP parameters:
+ * - `window=1`: The validation window. Used when validating hash-based
+ *   one-time passwords. A one-time password is valid if it represents a
+ *   counter value within `[counter, counter + window)`, where
+ *   `[counter` is the inclusive minimum value accepted and
+ *   `counter + window)` is the exclusive maximum value accepted.
+ */
 export interface HOTPParams extends BaseParams {
   counter: number
 }
 
+/**
+ * TOTP parameters.
+ *
+ * TOTP parameters:
+ * - `window=1`: The validation window. Used when validating time-based
+ *   one-time passwords. A one-time password is valid if it represents a
+ *   time step value within `[counter - window, counter + window)`, where
+ *   `[counter - window` is the inclusive minimum server value accepted and
+ *   `counter + window)` is the exclusive maximum server value accepted.
+ * - `time=() => Date.now()/1000`: A function returning the current number
+ *   of seconds since the UNIX epoch.
+ * - `epoch=0`: The time offset in seconds since the UNIX epoch to use.
+ * - `period=30`: The time period. Used to divide the current time into
+ *   time steps.
+ */
 export interface TOTPParams extends BaseParams {
   time?: Date|number|(() => Date|number)
   epoch?: number
@@ -395,6 +447,28 @@ abstract class OTP {
 
 /**
  * Hash-based one-time (HOTP) password.
+ *
+ * *Usage*
+ *
+ * ```js
+ * var libotp = require('libotp')
+ * var secret = libotp.generateSecret()
+ *
+ * var params = { secret: secret, counter: 0 }
+ * var client = new libotp.HOTP(params)
+ * var server = new libotp.HOTP(params)
+ *
+ * // generate token on client
+ * var token = client.peek()
+ *
+ * // validate token on server
+ * if (server.test(token)) {
+ *   // Token is valid.
+ *   var counter = server.next()
+ *   // Important: persist counter value here.
+ * } else {
+ *   // Token is invalid.
+ * }
  */
 export class HOTP extends OTP {
   public readonly type: string = 'hotp'
@@ -424,23 +498,24 @@ export class HOTP extends OTP {
    */
   constructor(params: HOTPParams) {
     super(params)
-    if (params.counter == null) throw new Error('missing counter')
-    this._counter = params.counter
+
+    // check-assign counter
+    const counter = params.counter
+    if (counter == null) throw new Error('missing counter')
+    if (Math.floor(counter) !== counter) throw new Error('invalid counter')
+    this._counter = counter
   }
 
   /**
-   * Generate a HOTP token, incrementing the counter value.
+   * Increment the counter value.
    *
-   * The `this.counter` value is incremented by 1 after the token is
-   * generated. The new counter value must be stored in durable storage,
-   * with conflicting updates resolving to the largest counter value.
+   * The new counter value must be stored in durable storage, with
+   * conflicting updates resolving to the largest counter value.
    *
-   * @return {string} The TOTP token.
+   * @return {number} The counter value.
    */
-  public next(): string {
-    const token = this.peek()
-    this._counter++
-    return token
+  public next(): number {
+    return ++this._counter
   }
 
   /**
@@ -490,17 +565,28 @@ export class HOTP extends OTP {
  *
  * *Usage*
  *
- * ```js
- * var crypto = require('crypto');
- * var secret = crypto.randomBytes(20);
+ * var libotp = require('libotp')
+ * var secret = libotp.generateSecret()
  *
  * // with default options
- * var otp = new TOTP({secret: secret});
- * var token = otp.next();
- * var isValid = otp.test(token);
+ * var params = { secret: secret }
+ * var client = new libotp.TOTP(params)
+ * var server = new libotp.TOTP(params)
  *
  * // with custom window and time period
- * var otp = new TOTP({secret: secret, window: 1, period: 60});
+ * var params = { secret: secret, window: 1, period: 60 }
+ * var client = new libotp.TOTP(params)
+ * var server = new libotp.TOTP(params)
+ *
+ * // generate token on client
+ * var token = client.peek()
+ *
+ * // validate token on server
+ * if (server.test(token)) {
+ *   // Token is valid.
+ * } else {
+ *   // Token is invalid.
+ * }
  * ```
  */
 export class TOTP extends OTP {
@@ -586,6 +672,4 @@ export class TOTP extends OTP {
     const time = typeof this.time === 'function' ? this.time() : this.time
     return Math.floor((time - this.epoch) / this.period)
   }
-
-  public next = TOTP.prototype.peek
 }

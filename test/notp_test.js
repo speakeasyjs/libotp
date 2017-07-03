@@ -219,17 +219,17 @@ it('totp_gen', function () {
 
   // countercheck for test vector at 59s
   options.time = 59;
-  assert.equal(new libotp.TOTP(options).next(), '287082', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).peek(), '287082', 'TOTtoken values should match');
 
   // countercheck for test vector at 1234567890
   options.time = 1234567890;
-  assert.equal(new libotp.TOTP(options).next(), '005924', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).peek(), '005924', 'TOTtoken values should match');
 
   // countercheck for test vector at 1111111109
   options.time = 1111111109;
-  assert.equal(new libotp.TOTP(options).next(), '081804', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).peek(), '081804', 'TOTtoken values should match');
 
   // countercheck for test vector at 2000000000
   options.time = 2000000000;
-  assert.equal(new libotp.TOTP(options).next(), '279037', 'TOTtoken values should match');
+  assert.equal(new libotp.TOTP(options).peek(), '279037', 'TOTtoken values should match');
 });
