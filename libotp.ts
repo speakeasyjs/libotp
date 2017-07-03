@@ -117,7 +117,7 @@ function padSecret(secret: Buffer, byteSize: number): Buffer {
  * @param {number} [algorithm=sha1] Algorithm for which to generate secret.
  * @param {string} [encoding="base32"] Encoding for returned secret. Set to
  *   falsy for Buffer.
- * @return {string} The generated secret.
+ * @return {string|Buffer} The generated secret.
  */
 export function generateSecret(algorithm='sha1', encoding='base32'): string|Buffer {
   const byteSize = byteSizeForAlgo(algorithm)
